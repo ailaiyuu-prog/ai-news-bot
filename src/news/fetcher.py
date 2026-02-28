@@ -1,5 +1,5 @@
 """
-News fetcher module - Fetches real-time AI news from various sources
+News fetcher module - Fetches real-time finance, crypto and geopolitical news
 """
 import requests
 from typing import List, Dict, Optional
@@ -12,184 +12,78 @@ logger = setup_logger(__name__)
 
 
 class NewsFetcher:
-    """Fetch real-time AI news from RSS feeds and news APIs"""
+    """Fetch real-time finance, crypto and geopolitical news from RSS feeds"""
 
     def __init__(self):
         """Initialize the news fetcher"""
-        # RSS feed sources for AI news (reliable sources only)
-        self.rss_feeds = {
-            # Major Tech Media
-            "TechCrunch AI": "https://techcrunch.com/tag/artificial-intelligence/feed/",
-            "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",
-            "MIT Technology Review": "https://www.technologyreview.com/feed/",
-            "Ars Technica AI": "https://arstechnica.com/tag/ai/feed/",
-            "Wired AI": "https://www.wired.com/feed/tag/ai/latest/rss",
-            "The Next Web": "https://thenextweb.com/feed",
-            "The Verge AI": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-            "Engadget AI": "https://www.engadget.com/tag/ai/rss.xml",
-
-            # Official AI Company Blogs
-            "OpenAI Blog": "https://openai.com/blog/rss/",
-            "Google AI Blog": "https://blog.google/technology/ai/rss/",
-            "DeepMind Blog": "https://deepmind.google/blog/rss.xml",
-            "Meta AI Blog": "https://ai.meta.com/blog/rss/",
-            "Microsoft AI Blog": "https://blogs.microsoft.com/ai/feed/",
-
-            # Research & Academic
-            "arXiv AI": "https://rss.arxiv.org/rss/cs.AI",
-            "arXiv Machine Learning": "https://rss.arxiv.org/rss/cs.LG",
-            "arXiv Computer Vision": "https://rss.arxiv.org/rss/cs.CV",
-            "arXiv NLP": "https://rss.arxiv.org/rss/cs.CL",
-
-            # Industry Verticals
-            "Healthcare IT News AI": "https://www.healthcareitnews.com/taxonomy/term/31/feed",
-            "Robotics Business Review": "https://www.roboticsbusinessreview.com/feed/",
-            "Autonomous Vehicle News": "https://www.autonomousvehicleinternational.com/feed",
+        
+        # ========== 中国股市 ==========
+        self.china_stock_feeds = {
+            "新浪财经": "https://finance.sina.com.cn/stock/",
+            "东方财富": "https://www.eastmoney.com/",
+            "腾讯财经": "https://finance.qq.com/stock/",
+            "同花顺": "https://www.10jqka.com.cn/",
+            "雪球": "https://xueqiu.com/hq",
+            "证券时报": "http://www.stcn.com/",
+            "第一财经": "https://www.yicai.com/news/",
+            "财新网": "http://www.caixin.com/",
         }
 
-        # Chinese AI news sources (zh)
-        self.chinese_feeds = {
-            # Tech News Outlets
-            "36Kr (36氪)": "https://36kr.com/feed",
-            "JiQiZhiXin (机器之心)": "https://www.jiqizhixin.com/rss",
-            "Leiphone (雷锋网)": "https://www.leiphone.com/feed",
-            "iFeng Tech (凤凰科技)": "https://tech.ifeng.com/rss/index.xml",
-            "Sina Tech (新浪科技)": "http://rss.sina.com.cn/tech/rollnews.xml",
-            # Google News (fallback)
-            "Google News AI (CN)": "https://news.google.com/rss/search?q=人工智能+AI&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
-            "Google News LLM (CN)": "https://news.google.com/rss/search?q=大模型+GPT+Claude&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        # ========== 美国股市 ==========
+        self.us_stock_feeds = {
+            "Yahoo Finance": "https://finance.yahoo.com/news/rssindex",
+            "CNBC": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+            "MarketWatch": "https://feeds.marketwatch.com/marketwatch/topstories/",
+            "Reuters Business": "https://www.reutersagency.com/feed/?best-topics=business-finance",
+            "WSJ": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+            "Bloomberg": "https://feeds.bloomberg.com/markets/news.rss",
+            "Barron's": "https://feeds.barrons.com/rss/all",
         }
 
-        # Japanese AI news sources (ja)
-        self.japanese_feeds = {
-            # Tech News Outlets
-            "ITmedia AI+": "https://rss.itmedia.co.jp/rss/2.0/aiplus.xml",
-            "Nikkei xTECH": "https://xtech.nikkei.com/rss/index.rdf",
-            "ASCII.jp AI": "https://ascii.jp/elem/000/004/000/4000000/index-2.xml",
-            "Impress Watch": "https://www.watch.impress.co.jp/data/rss/1.0/ipw/feed.rdf",
-            # Google News (fallback)
-            "Google News AI (JP)": "https://news.google.com/rss/search?q=人工知能+AI&hl=ja&gl=JP&ceid=JP:ja",
-            "Google News Tech (JP)": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcG9HZ0pEVGlnQVAB?hl=ja&gl=JP&ceid=JP:ja",
+        # ========== 虚拟货币 ==========
+        self.crypto_feeds = {
+            "CoinDesk": "https://www.coindesk.com/feed/",
+            "CoinTelegraph": "https://cointelegraph.com/rss",
+            "Decrypt": "https://decrypt.co/feed",
+            "The Block": "https://www.theblock.co/feed",
+            "CryptoSlate": "https://cryptoslate.com/feed/",
+            "Binance Blog": "https://www.binance.com/en/blog/feed",
+            "吴说区块链": "https://www.wu-talk.com/feed",
         }
 
-        # French AI news sources (fr)
-        self.french_feeds = {
-            # Tech News Outlets
-            "L'Usine Digitale": "https://www.usine-digitale.fr/rss/intelligence-artificielle.xml",
-            "01net": "https://www.01net.com/rss/actualites/",
-            "Frandroid": "https://www.frandroid.com/feed",
-            "BFM Tech": "https://www.bfmtv.com/rss/tech/",
-            # Google News (fallback)
-            "Google News AI (FR)": "https://news.google.com/rss/search?q=intelligence+artificielle&hl=fr&gl=FR&ceid=FR:fr",
-            "Google News Tech (FR)": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcG9HZ0pEVGlnQVAB?hl=fr&gl=FR&ceid=FR:fr",
+        # ========== 宏观经济 ==========
+        self.macro_feeds = {
+            "Investing.com": "https://www.investing.com/rss/news.rss",
+            "TradingEconomics": "https://tradingeconomics.com/rss",
+            "美联储": "https://www.federalreserve.gov/feeds/press_all.xml",
+            "IMF": "https://www.imf.org/external/rss/rss.aspx?type=news",
+            "世界银行": "https://feeds.worldbank.org/RSS/RSS2.xml",
+            "华尔街见闻": "https://wallstreetcn.com/rss",
+            "彭博社中文": "https://www.bloomberg.com/feeds/markets",
         }
 
-        # Spanish AI news sources (es)
-        self.spanish_feeds = {
-            # Tech News Outlets
-            "Xataka": "https://www.xataka.com/tag/inteligencia-artificial/rss2.xml",
-            "El País Tecnología": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada",
-            "Hipertextual": "https://hipertextual.com/feed",
-            "Genbeta": "https://www.genbeta.com/tag/inteligencia-artificial/rss2.xml",
-            # Google News
-            "Google News AI (ES)": "https://news.google.com/rss/search?q=inteligencia+artificial&hl=es&gl=ES&ceid=ES:es",
+        # ========== 中国政治 ==========
+        self.china_politics_feeds = {
+            "新华社": "http://www.xinhuanet.com/politics/news_politics.xml",
+            "人民网": "http://politics.people.com.cn/rss/zzb.xml",
+            "环球时报": "https://global.huanqiu.com/rss",
+            "中国日报": "https://cn.chinadaily.com.cn/rss",
+            "参考消息": "https://www.cankaoxiaoxi.com/feed",
+            "外交部": "https://www.mfa.gov.cn/web/fyrbt_673021/jzzwl_673057/rss.xml",
         }
 
-        # German AI news sources (de)
-        self.german_feeds = {
-            # Tech News Outlets
-            "Heise Online": "https://www.heise.de/rss/heise-atom.xml",
-            "t3n Digital Pioneers": "https://t3n.de/tag/kuenstliche-intelligenz/feed/",
-            "Golem.de": "https://rss.golem.de/rss.php?feed=RSS2.0",
-            "Computerwoche": "https://www.computerwoche.de/rss/feed/computerwoche-alle",
-            # Google News
-            "Google News AI (DE)": "https://news.google.com/rss/search?q=künstliche+intelligenz&hl=de&gl=DE&ceid=DE:de",
+        # ========== 国际政治 ==========
+        self.global_politics_feeds = {
+            "BBC News": "https://feeds.bbci.co.uk/news/world/rss.xml",
+            "Reuters": "https://www.reutersagency.com/feed/?best-topics=politics",
+            "AP News": "https://feeds.apnews.com/apnews/topnews",
+            "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
+            "欧盟": "https://ec.europa.eu/rss/en/rss.xml",
+            "联合国": "https://news.un.org/rss/en/sitemap.xml",
         }
-
-        # Korean AI news sources (ko)
-        self.korean_feeds = {
-            # Tech News Outlets
-            "Chosun Biz Tech": "https://biz.chosun.com/rss/tech.xml",
-            "ZDNet Korea": "https://zdnet.co.kr/rss/",
-            "ETNews": "https://rss.etnews.com/Section901.xml",
-            "Korean AI News": "https://www.aitimes.kr/rss/allArticle.xml",
-            # Google News
-            "Google News AI (KR)": "https://news.google.com/rss/search?q=인공지능&hl=ko&gl=KR&ceid=KR:ko",
-        }
-
-        # Portuguese AI news sources (pt)
-        self.portuguese_feeds = {
-            # Tech News Outlets
-            "TecMundo": "https://www.tecmundo.com.br/rss",
-            "Olhar Digital": "https://olhardigital.com.br/feed/",
-            "Canaltech": "https://canaltech.com.br/rss/",
-            "Exame": "https://exame.com/feed/tecnologia/",
-            # Google News
-            "Google News AI (BR)": "https://news.google.com/rss/search?q=inteligência+artificial&hl=pt-BR&gl=BR&ceid=BR:pt-419",
-        }
-
-        # Italian AI news sources (it)
-        self.italian_feeds = {
-            # Tech News Outlets
-            "Il Sole 24 Ore Tech": "https://www.ilsole24ore.com/rss/tecnologia.xml",
-            "Punto Informatico": "https://www.punto-informatico.it/feed/",
-            "Tom's Hardware IT": "https://www.tomshw.it/feed",
-            "Wired Italia": "https://www.wired.it/feed/rss",
-            # Google News
-            "Google News AI (IT)": "https://news.google.com/rss/search?q=intelligenza+artificiale&hl=it&gl=IT&ceid=IT:it",
-        }
-
-        # Russian AI news sources (ru)
-        self.russian_feeds = {
-            # Tech News Outlets
-            "Habr": "https://habr.com/ru/rss/all/",
-            "CNews": "https://www.cnews.ru/inc/rss/news.xml",
-            "Roem.ru": "https://roem.ru/feed/",
-            "VC.ru": "https://vc.ru/rss/all",
-            # Google News
-            "Google News AI (RU)": "https://news.google.com/rss/search?q=искусственный+интеллект&hl=ru&gl=RU&ceid=RU:ru",
-        }
-
-        # Dutch AI news sources (nl)
-        self.dutch_feeds = {
-            # Tech News Outlets
-            "Tweakers": "https://feeds.feedburner.com/tweakers/mixed",
-            "Computable": "https://www.computable.nl/rss.xml",
-            "Dutch IT Channel": "https://dutchitchannel.nl/feed/",
-            # Google News
-            "Google News AI (NL)": "https://news.google.com/rss/search?q=kunstmatige+intelligentie&hl=nl&gl=NL&ceid=NL:nl",
-        }
-
-        # Arabic AI news sources (ar)
-        self.arabic_feeds = {
-            # Tech News Outlets
-            "Arageek": "https://www.arageek.com/feed",
-            "Tech Wd": "https://www.tech-wd.com/feed/",
-            # Google News
-            "Google News AI (AR)": "https://news.google.com/rss/search?q=الذكاء+الاصطناعي&hl=ar&gl=SA&ceid=SA:ar",
-        }
-
-        # Hindi AI news sources (hi)
-        self.hindi_feeds = {
-            # Tech News Outlets
-            "Jagran Josh Tech": "https://www.jagranjosh.com/rss/tech.xml",
-            "NDTV Gadgets": "https://feeds.feedburner.com/ndtvgadgets-latest",
-            # Google News
-            "Google News AI (HI)": "https://news.google.com/rss/search?q=कृत्रिम+बुद्धिमत्ता&hl=hi&gl=IN&ceid=IN:hi",
-        }
-
 
     def fetch_rss_feed(self, feed_url: str, max_items: int = 10) -> List[Dict[str, str]]:
-        """
-        Fetch news items from an RSS feed.
-
-        Args:
-            feed_url: URL of the RSS feed
-            max_items: Maximum number of items to fetch
-
-        Returns:
-            List of news items with title, link, description, and published date
-        """
+        """Fetch news items from an RSS feed."""
         try:
             logger.info(f"Fetching RSS feed: {feed_url}")
 
@@ -200,11 +94,9 @@ class NewsFetcher:
             response = requests.get(feed_url, headers=headers, timeout=10)
             response.raise_for_status()
 
-            # Parse XML
             root = ET.fromstring(response.content)
-
             items = []
-            # Handle both RSS 2.0 and Atom formats
+
             if root.tag == 'rss':
                 news_items = root.findall('.//item')[:max_items]
                 for item in news_items:
@@ -220,7 +112,6 @@ class NewsFetcher:
                         'published': pub_date.text if pub_date is not None else '',
                     })
             else:
-                # Atom format
                 namespace = {'atom': 'http://www.w3.org/2005/Atom'}
                 entries = root.findall('.//atom:entry', namespace)[:max_items]
                 for entry in entries:
@@ -251,101 +142,92 @@ class NewsFetcher:
 
     def fetch_recent_news(
         self,
-        language: str = "en",
+        language: str = "zh",
         max_items_per_source: int = 5
     ) -> Dict[str, List[Dict[str, str]]]:
-        """
-        Fetch recent AI news from all configured sources.
-
-        Args:
-            language: Language code for the response
-            max_items_per_source: Maximum items to fetch per source
-
-        Returns:
-            Dictionary with 'international' and 'domestic' news lists
-        """
-        logger.info("Fetching recent AI news from all sources...")
+        """Fetch recent finance, crypto and geopolitical news."""
+        logger.info("Fetching recent finance and geopolitics news from all sources...")
 
         all_news = {
-            'international': [],
-            'domestic': []
+            'china_stock': [],
+            'us_stock': [],
+            'crypto': [],
+            'macro': [],
+            'china_politics': [],
+            'global_politics': [],
         }
 
-        # Fetch international news
-        for source_name, feed_url in self.rss_feeds.items():
+        # Fetch China Stock news
+        for source_name, feed_url in self.china_stock_feeds.items():
             items = self.fetch_rss_feed(feed_url, max_items_per_source)
             for item in items:
                 item['source'] = source_name
-                all_news['international'].append(item)
+                all_news['china_stock'].append(item)
 
-        # Fetch domestic news based on language
-        language_feeds_map = {
-            "zh": self.chinese_feeds,
-            "ja": self.japanese_feeds,
-            "fr": self.french_feeds,
-            "es": self.spanish_feeds,
-            "de": self.german_feeds,
-            "ko": self.korean_feeds,
-            "pt": self.portuguese_feeds,
-            "it": self.italian_feeds,
-            "ru": self.russian_feeds,
-            "nl": self.dutch_feeds,
-            "ar": self.arabic_feeds,
-            "hi": self.hindi_feeds,
-        }
-
-        feeds = language_feeds_map.get(language)
-        if not feeds:
-            logger.warning(f"No domestic feeds configured for language: {language}, using international only")
-            return all_news
-
-        for source_name, feed_url in feeds.items():
+        # Fetch US Stock news
+        for source_name, feed_url in self.us_stock_feeds.items():
             items = self.fetch_rss_feed(feed_url, max_items_per_source)
             for item in items:
                 item['source'] = source_name
-                all_news['domestic'].append(item)
+                all_news['us_stock'].append(item)
 
-        logger.info(
-            f"Fetched {len(all_news['international'])} international news items "
-            f"and {len(all_news['domestic'])} domestic ({language}) news items"
-        )
+        # Fetch Crypto news
+        for source_name, feed_url in self.crypto_feeds.items():
+            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            for item in items:
+                item['source'] = source_name
+                all_news['crypto'].append(item)
+
+        # Fetch Macro news
+        for source_name, feed_url in self.macro_feeds.items():
+            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            for item in items:
+                item['source'] = source_name
+                all_news['macro'].append(item)
+
+        # Fetch China Politics news
+        for source_name, feed_url in self.china_politics_feeds.items():
+            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            for item in items:
+                item['source'] = source_name
+                all_news['china_politics'].append(item)
+
+        # Fetch Global Politics news
+        for source_name, feed_url in self.global_politics_feeds.items():
+            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            for item in items:
+                item['source'] = source_name
+                all_news['global_politics'].append(item)
+
+        logger.info(f"Fetched: 中国股市 {len(all_news['china_stock'])}, 美国股市 {len(all_news['us_stock'])}, 虚拟货币 {len(all_news['crypto'])}, 宏观经济 {len(all_news['macro'])}, 中国政治 {len(all_news['china_politics'])}, 国际政治 {len(all_news['global_politics'])}")
 
         return all_news
 
     def format_news_for_summary(self, news_data: Dict[str, List[Dict[str, str]]]) -> str:
-        """
-        Format fetched news into a text suitable for AI summarization.
+        """Format fetched news into a text suitable for AI summarization."""
+        formatted = "# 财经与政治新闻汇总\n\n"
 
-        Args:
-            news_data: Dictionary with 'international' and 'domestic' news lists
+        categories = {
+            'china_stock': '中国股市',
+            'us_stock': '美国股市',
+            'crypto': '虚拟货币',
+            'macro': '宏观经济',
+            'china_politics': '中国政治',
+            'global_politics': '国际政治',
+        }
 
-        Returns:
-            Formatted news text
-        """
-        formatted = "# Recent AI News Items to Summarize\n\n"
-
-        if news_data['international']:
-            formatted += "## International News\n\n"
-            for i, item in enumerate(news_data['international'], 1):
-                formatted += f"### {i}. {item['title']}\n"
-                formatted += f"**Source:** {item['source']}\n"
-                if item['description']:
-                    formatted += f"**Description:** {item['description'][:300]}...\n"
-                formatted += f"**Link:** {item['link']}\n"
-                if item['published']:
-                    formatted += f"**Published:** {item['published']}\n"
-                formatted += "\n"
-
-        if news_data['domestic']:
-            formatted += "## Domestic News\n\n"
-            for i, item in enumerate(news_data['domestic'], 1):
-                formatted += f"### {i}. {item['title']}\n"
-                formatted += f"**Source:** {item['source']}\n"
-                if item['description']:
-                    formatted += f"**Description:** {item['description'][:300]}...\n"
-                formatted += f"**Link:** {item['link']}\n"
-                if item['published']:
-                    formatted += f"**Published:** {item['published']}\n"
-                formatted += "\n"
+        for key, name in categories.items():
+            if news_data.get(key):
+                formatted += f"## {name}\n\n"
+                for i, item in enumerate(news_data[key], 1):
+                    formatted += f"### {i}. {item['title']}\n"
+                    formatted += f"**来源:** {item['source']}\n"
+                    if item['description']:
+                        desc = item['description'][:500] if len(item['description']) > 500 else item['description']
+                        formatted += f"**摘要:** {desc}\n"
+                    formatted += f"**链接:** {item['link']}\n"
+                    if item['published']:
+                        formatted += f"**发布时间:** {item['published']}\n"
+                    formatted += "\n"
 
         return formatted

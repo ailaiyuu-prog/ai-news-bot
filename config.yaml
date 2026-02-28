@@ -6,12 +6,12 @@ llm:
   # Gemini: Fast, multimodal, free tier available
   # Grok: Advanced reasoning, real-time data
   # OpenAI: Industry standard, latest models
-  provider: claude
+  provider: deepseek
 
   # Optional: Specify a model (if not set, uses provider's default)
   # Claude models: claude-sonnet-4-5-20250929, claude-3-5-sonnet-20241022
   # DeepSeek models: deepseek-chat, deepseek-reasoner
-  # model: claude-sonnet-4-5-20250929
+  # model: deepseek-chat
 
 news:
   # Enable web search tool (uses DuckDuckGo API via LLM tool calling)
@@ -23,98 +23,80 @@ news:
   max_items_per_source: 10
 
   # Stage 1: Selection prompt template
-  # Placeholders: {total_items}, {formatted_news}
   stage1_prompt_template: |
       {formatted_news}
 
-      ## YOUR TASK - STAGE 1: NEWS SELECTION
+      ## 任务 - 第一阶段：新闻筛选
 
-      You are a senior AI industry analyst. Analyze the {total_items} news items above and select exactly 15-20 of the highest-quality items.
+      你是一位资深财经分析师。分析上述新闻，筛选出15-20条最具价值的新闻。
 
-      ### SELECTION CRITERIA:
-      - ✅ Groundbreaking research or technical breakthroughs
-      - ✅ Major product launches or significant updates
-      - ✅ Important policy changes or regulations
-      - ✅ Large funding rounds or M&A activities
-      - ✅ Balanced coverage across categories (LLM, Agents, Research, Products, etc.)
-      - ✅ Include both international and domestic news when available
-      - ✅ Prefer primary sources over secondary reporting
+      ### 筛选标准：
+      - ✅ 影响市场走势的重大事件
+      - ✅ 宏观经济数据发布（CPI、PPI、GDP、就业等）
+      - ✅ 各国央行政策动态（美联储、央行利率决议）
+      - ✅ 地缘政治重大事件（战争、制裁、谈判）
+      - ✅ 重要政策变化和会议
+      - ✅ 加密货币市场重大动态
+      - ✅ 平衡各分类的覆盖
 
-      ### OUTPUT FORMAT:
-      Return ONLY a JSON array of selected news IDs. No explanations, no markdown, just the JSON array.
+      ### 输出格式：
+      仅返回JSON数组形式的新闻ID，无需解释。
 
-      Example format:
-      ["INT-1", "INT-5", "DOM-2", "INT-12", ...]
+      示例格式：
+      ["china_stock-1", "us_stock-3", "crypto-2", ...]
 
-      CRITICAL: Select exactly 15-20 items. No more, no less.
+      注意：必须筛选出15-20条新闻。
 
-  # Stage 2: Summarization prompt template (complete prompt for creating the digest)
-  # Placeholders: {count}, {selected_news}
+  # Stage 2: Summarization prompt template
   stage2_prompt_template: |
-      You are a senior AI industry analyst. Create a comprehensive, in-depth news digest for the {count} pre-selected news items below.
+      你是一位资深财经分析师。为以下预选的新闻创建一份全面的每日财经简报。
 
       {selected_news}
 
-      ## OUTPUT STRUCTURE:
+      ## 输出结构：
 
-      Organize news items into relevant categories (use only categories that have news):
-      1. **Large Language Models & Foundation Models** - LLM updates, new model releases, benchmarks
-      2. **AI Agents & Autonomous Systems** - Agent frameworks, autonomous AI developments
-      3. **Multimodal AI** - Vision, audio, video AI capabilities
-      4. **Research & Academic Breakthroughs** - Papers, scientific discoveries, new methods
-      5. **Product Launches & Updates** - New products, feature releases, API updates
-      6. **AI Infrastructure & Hardware** - Chips, GPUs, training infrastructure, cloud services
-      7. **Healthcare & Biomedical AI** - Medical AI, drug discovery, diagnostics
-      8. **Robotics & Autonomous Vehicles** - Robots, self-driving, embodied AI
-      9. **Enterprise & Industry Applications** - B2B solutions, industry-specific AI
-      10. **Funding & Market Dynamics** - Investments, acquisitions, valuations
-      11. **Policy & Regulation** - Government policies, AI governance, ethics
-      12. **Open Source & Community** - Open source projects, community developments
+      按以下分类组织新闻（只使用有新闻的分类）：
+      1. **中国股市** - A股、科创板、北交所、重大政策
+      2. **美国股市** - 美股大盘、巨头财报、重要经济数据
+      3. **虚拟货币** - 比特币、以太坊、山寨币、交易所动态
+      4. **宏观经济** - GDP、CPI、美联储、央行政策
+      5. **中国政治** - 重要政策、会议、重大事件
+      6. **国际政治** - 地缘政治、重大国际事件
 
-      ## CONTENT REQUIREMENTS:
+      ## 内容要求：
 
-      For each news item, provide:
-      1. **Clear Headline**: Informative title that captures the key development
-      2. **Analytical Summary (4-6 sentences)**:
-         - What happened (core news and context)
-         - Technical details, key specifications, or metrics
-         - Why it matters (industry significance and impact)
-         - Potential implications (future developments, competitive landscape)
-      3. **Source Attribution**: Always include as clickable markdown link: [Source Name](URL)
+      每条新闻需包含：
+      1. **清晰标题**：简明扼要
+      2. **分析性摘要（4-6句）**：
+         - 发生了什么（核心新闻和背景）
+         - 关键数据、指标
+         - 对市场的影响（如果有）
+         - 未来可能的发展
+      3. **来源**：始终包含可点击链接
 
-      ## WRITING STYLE:
-      - Professional, analytical tone suitable for industry professionals
-      - Include specific numbers, metrics, and data points when available
-      - Keep technical terminology accurate (preserve technical jargon)
-      - Balance accessibility with technical depth
-      - Provide context and analysis, not just reporting facts
+      ## 写作风格：
+      - 专业分析语气
+      - 包含具体数据
+      - 客观准确，避免猜测
 
-      ## EXAMPLE FORMAT:
+      ## 格式示例：
 
-      ## Large Language Models & Foundation Models
+      ## 中国股市
 
-      ### OpenAI Releases GPT-5 with Revolutionary Capabilities
+      ### A股三大指数今日集体上涨
 
-      OpenAI has announced GPT-5, featuring a 10 trillion parameter architecture with unprecedented reasoning abilities. The model demonstrates 40% improvement on complex reasoning benchmarks and introduces native multimodal understanding. This release marks a significant leap in AI capability, potentially reshaping competitive dynamics in the LLM market. Enterprise customers report 3x productivity gains in early testing, suggesting immediate practical applications.
+      今日A股市场震荡上扬，沪指涨0.85%，深成指涨1.12%，创业板指涨1.23%。成交量较前一交易日放大15%。券商板块整体走强，龙头股涨停。分析师认为，此轮上涨主要受政策利好和经济数据企稳提振。
 
-      Source: [OpenAI Blog](https://openai.com/blog/gpt-5)
+      来源: [新浪财经](https://finance.sina.com.cn)
 
       ---
 
-      ## QUALITY REQUIREMENTS:
-      - ✅ Summarize ALL {count} items provided above (no skipping)
-      - ✅ Each summary must be exactly 4-6 sentences
-      - ✅ Include specific numbers, metrics, and data when available
-      - ✅ Maintain balanced coverage across different categories
-      - ✅ Include both international and domestic news
-      - ✅ Prioritize accuracy over speculation
-      - ✅ All sources must have clickable markdown links
-
-      ## AVOID:
-      ❌ Generic statements without specifics
-      ❌ Summaries shorter than 4 sentences or longer than 6 sentences
-      ❌ Missing clickable links or improper markdown formatting
-      ❌ Skipping any news items
+      ## 质量要求：
+      - ✅ 总结所有 {count} 条新闻
+      - ✅ 每条摘要4-6句
+      - ✅ 包含具体数据和指标
+      - ✅ 平衡各分类覆盖
+      - ✅ 所有来源必须有可点击链接
 
 logging:
   level: INFO

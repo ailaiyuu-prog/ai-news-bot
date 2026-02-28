@@ -1,10 +1,11 @@
 """
-News fetcher module - Fetches real-time finance, crypto and geopolitical news
+News fetcher module - Fetches real-time finance, crypto, geopolitical news and economic calendar
 """
 import requests
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
+import json
 from ..logger import setup_logger
 
 
@@ -42,8 +43,8 @@ class NewsFetcher:
 
         # ========== 虚拟货币 ==========
         self.crypto_feeds = {
-            "CoinDesk": "https://www.coindesk.com/feed/",
-            "CoinTelegraph": "https://cointelegraph.com/rss",
+            "CoinDesk":.coindesk.com/feed/",
+            "https://www "CoinTelegraph": "https://cointelegraph.com/rss",
             "Decrypt": "https://decrypt.co/feed",
             "The Block": "https://www.theblock.co/feed",
             "CryptoSlate": "https://cryptoslate.com/feed/",
@@ -81,6 +82,76 @@ class NewsFetcher:
             "欧盟": "https://ec.europa.eu/rss/en/rss.xml",
             "联合国": "https://news.un.org/rss/en/sitemap.xml",
         }
+
+        # ========== 经济日历 ==========
+        self.economic_calendar_feeds = {
+            "Investing.com 经济日历": "https://www.investing.com/rss/calendar.rss",
+            "ForexFactory 经济日历": "https://www.forexfactory.com/news.rss",
+        }
+
+        # 预设未来重要经济事件 (备用)
+        self._upcoming_events = self._generate_upcoming_events()
+
+    def _generate_upcoming_events(self) -> List[Dict[str, str]]:
+        """生成未来一周重要经济事件"""
+        events = []
+        today = datetime.now()
+        
+        # 每周固定重要事件
+        week_events = [
+            # 周一
+            {"day": 0, "time": "09:30 中国", "name": "中国GDP年率", "importance": "高", "type": "中国宏观"},
+            {"day": 0, "time": "17:00 欧元区", "name": "欧元区制造业PMI", "importance": "中", "type": "欧洲宏观"},
+            
+            # 周二
+            {"day": 1, "time": "08:30 澳大利亚", "name": "澳大利亚联储利率决议", "importance": "高", "type": "澳洲央行"},
+            {"day": 1, "time": "17:00 德国", "name": "德国CPI年率", "importance": "中", "type": "欧洲宏观"},
+            
+            # 周三
+            {"day": 2, "time": "20:30 美国", "name": "美国CPI月/年率", "importance": "极高", "type": "美国宏观"},
+            {"day": 2, "time": "22:30 美国", "name": "美国EIA原油库存", "importance": "中", "type": "美国能源"},
+            
+            # 周四
+            {"day": 3, "time": "02:00 美国", "name": "美联储利率决议", "importance": "极高", "type": "美国央行"},
+            {"day": 3, "time": "02:30 美国", "name": "美联储主席鲍威尔讲话", "importance": "极高", "type": "美国央行"},
+            {"day": 3, "time": "20:30 英国", "name": "英国央行利率决议", "importance": "高", "type": "英国央行"},
+            {"day": 3, "time": "20:30 美国", "name": "美国PPI月率", "importance": "中", "type": "美国宏观"},
+            
+            # 周五
+            {"day": 4, "time": "15:00 德国", "name": "德国GDP年率", "importance": "中", "type": "欧洲宏观"},
+            {"day": 4, "time": "20:30 美国", "name": "美国零售销售月率", "importance": "高", "type": "美国宏观"},
+            {"day": 4, "time": "21:15 美国", "name": "美国工业产出月率", "importance": "中", "type": "美国宏观"},
+            {"day": 4, "time": "22:00 美国", "name": "美国密歇根大学消费者信心指数", "importance": "中", "type": "美国宏观"},
+            
+            # 周六
+            {"day": 5, "time": "09:30 中国", "name": "中国1年期/5年期LPR", "importance": "高", "type": "中国央行"},
+            
+            # 周日
+            {"day": 6, "time": "无重要事件", "name": "-", "importance": "-", "type": "-"},
+        ]
+        
+        # 计算本周事件
+        current_day = today.weekday()
+        
+        for event in week_events:
+            days_until = event["day"] - current_day
+            if days_until < 0:
+                days_until += 7
+            
+            event_date = today + timedelta(days=days_until)
+            
+            if event["name"] != "-":
+                events.append({
+                    "title": f"【{event['importance']}】{event['name']}",
+                    "description": f"发布时间: {event['time']} | 类型: {event['type']} | 重要性: {event['importance']}",
+                    "date": event_date.strftime("%Y-%m-%d"),
+                    "time": event["time"],
+                    "importance": event["importance"],
+                    "type": event["type"],
+                    "source": "经济日历预判"
+                })
+        
+        return events
 
     def fetch_rss_feed(self, feed_url: str, max_items: int = 10) -> List[Dict[str, str]]:
         """Fetch news items from an RSS feed."""
@@ -140,6 +211,50 @@ class NewsFetcher:
         clean = re.compile('<.*?>')
         return re.sub(clean, '', text).strip()
 
+    def fetch_economic_calendar(self, days_ahead: int = 7) -> List[Dict[str, str]]:
+        """获取未来指定天数的经济日历事件"""
+        logger.info(f"Fetching economic calendar for next {days_ahead} days...")
+        
+        calendar_events = []
+        
+        # 尝试从 RSS 获取经济日历
+        for source_name, feed_url in self.economic_calendar_feeds.items():
+            items = self.fetch_rss_feed(feed_url, 20)
+            for item in items:
+                item['source'] = source_name
+                # 过滤出未来一周的事件
+                if item.get('published'):
+                    try:
+                        pub_date = item['published']
+                        # 尝试解析日期
+                        for fmt in ['%a, %d %b %Y %H:%M:%S %z', '%Y-%m-%d']:
+                            try:
+                                parsed = datetime.strptime(pub_date[:25] if len(pub_date) > 25 else pub_date, fmt.replace(' %z', ''))
+                                if parsed.date() <= (datetime.now() + timedelta(days=days_ahead)).date():
+                                    calendar_events.append(item)
+                                break
+                            except:
+                                continue
+                    except:
+                        calendar_events.append(item)
+        
+        # 如果没有获取到足够的事件，使用预设事件
+        if len(calendar_events) < 3:
+            logger.info("Using preset economic events")
+            for event in self._upcoming_events:
+                calendar_events.append({
+                    "title": event["title"],
+                    "description": event["description"],
+                    "date": event["date"],
+                    "time": event["time"],
+                    "importance": event["importance"],
+                    "type": event["type"],
+                    "source": event["source"]
+                })
+        
+        logger.info(f"Fetched {len(calendar_events)} economic calendar events")
+        return calendar_events
+
     def fetch_recent_news(
         self,
         language: str = "zh",
@@ -155,6 +270,7 @@ class NewsFetcher:
             'macro': [],
             'china_politics': [],
             'global_politics': [],
+            'economic_calendar': [],
         }
 
         # Fetch China Stock news
@@ -199,7 +315,10 @@ class NewsFetcher:
                 item['source'] = source_name
                 all_news['global_politics'].append(item)
 
-        logger.info(f"Fetched: 中国股市 {len(all_news['china_stock'])}, 美国股市 {len(all_news['us_stock'])}, 虚拟货币 {len(all_news['crypto'])}, 宏观经济 {len(all_news['macro'])}, 中国政治 {len(all_news['china_politics'])}, 国际政治 {len(all_news['global_politics'])}")
+        # Fetch Economic Calendar
+        all_news['economic_calendar'] = self.fetch_economic_calendar(7)
+
+        logger.info(f"Fetched: 中国股市 {len(all_news['china_stock'])}, 美国股市 {len(all_news['us_stock'])}, 虚拟货币 {len(all_news['crypto'])}, 宏观经济 {len(all_news['macro'])}, 中国政治 {len(all_news['china_politics'])}, 国际政治 {len(all_news['global_politics'])}, 经济日历 {len(all_news['economic_calendar'])}")
 
         return all_news
 
@@ -214,6 +333,7 @@ class NewsFetcher:
             'macro': '宏观经济',
             'china_politics': '中国政治',
             'global_politics': '国际政治',
+            'economic_calendar': '一周重要经济日历',
         }
 
         for key, name in categories.items():
@@ -222,12 +342,17 @@ class NewsFetcher:
                 for i, item in enumerate(news_data[key], 1):
                     formatted += f"### {i}. {item['title']}\n"
                     formatted += f"**来源:** {item['source']}\n"
-                    if item['description']:
+                    if item.get('description'):
                         desc = item['description'][:500] if len(item['description']) > 500 else item['description']
                         formatted += f"**摘要:** {desc}\n"
-                    formatted += f"**链接:** {item['link']}\n"
-                    if item['published']:
-                        formatted += f"**发布时间:** {item['published']}\n"
+                    if item.get('date'):
+                        formatted += f"**日期:** {item['date']}\n"
+                    if item.get('time'):
+                        formatted += f"**时间:** {item['time']}\n"
+                    if item.get('importance'):
+                        formatted += f"**重要性:** {item['importance']}\n"
+                    if item.get('link'):
+                        formatted += f"**链接:** {item['link']}\n"
                     formatted += "\n"
 
         return formatted

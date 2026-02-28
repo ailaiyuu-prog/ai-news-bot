@@ -43,7 +43,7 @@ class NewsFetcher:
 
         # ========== 虚拟货币 ==========
         self.crypto_feeds = {
-            "CoinDesk":.coindesk.com/feed/",
+            "CoinDesk": "https://www.coindesk.com/feed/",
             "https://www "CoinTelegraph": "https://cointelegraph.com/rss",
             "Decrypt": "https://decrypt.co/feed",
             "The Block": "https://www.theblock.co/feed",

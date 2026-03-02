@@ -20,7 +20,7 @@ news:
   enable_web_search: false
 
   # Maximum news items to fetch per source (fetch more for AI to select from)
-  max_items_per_source: 10
+  max_items_per_source: 50
 
   # Stage 1: Selection prompt template
   stage1_prompt_template: |

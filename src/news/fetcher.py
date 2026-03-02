@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
 import json
 from ..logger import setup_logger
+import re
 
 
 logger = setup_logger(__name__)
@@ -153,8 +154,83 @@ class NewsFetcher:
         
         return events
 
-    def fetch_rss_feed(self, feed_url: str, max_items: int = 10) -> List[Dict[str, str]]:
-        """Fetch news items from an RSS feed."""
+    def _parse_datetime(self, date_str: str) -> Optional[datetime]:
+        """
+        解析各种格式的日期字符串
+        返回解析后的datetime对象，如果无法解析则返回None
+        """
+        if not date_str:
+            return None
+            
+        # 常见的日期格式
+        date_formats = [
+            '%a, %d %b %Y %H:%M:%S %z',  # RFC 2822格式: Wed, 01 Jan 2024 12:00:00 +0000
+            '%Y-%m-%dT%H:%M:%S%z',       # ISO 8601格式: 2024-01-01T12:00:00+00:00
+            '%Y-%m-%d %H:%M:%S',         # 标准格式: 2024-01-01 12:00:00
+            '%Y-%m-%d',                  # 日期格式: 2024-01-01
+            '%d %b %Y %H:%M:%S %z',      # 另一种RFC格式: 01 Jan 2024 12:00:00 +0000
+            '%a, %d %b %Y %H:%M:%S',     # 无时区格式: Wed, 01 Jan 2024 12:00:00
+        ]
+        
+        # 清理日期字符串
+        cleaned_date = date_str.strip()
+        
+        # 处理一些特殊情况
+        if 'GMT' in cleaned_date:
+            cleaned_date = cleaned_date.replace('GMT', '+0000')
+        if 'UTC' in cleaned_date:
+            cleaned_date = cleaned_date.replace('UTC', '+0000')
+            
+        for fmt in date_formats:
+            try:
+                # 对于带时区的格式，先尝试完整解析
+                if '%z' in fmt:
+                    parsed_dt = datetime.strptime(cleaned_date, fmt)
+                else:
+                    # 对于不带时区的格式，假设为本地时间
+                    parsed_dt = datetime.strptime(cleaned_date, fmt)
+                    
+                return parsed_dt
+            except ValueError:
+                continue
+                
+        # 如果标准格式都无法解析，尝试使用正则表达式提取日期
+        try:
+            # 匹配类似 "2024-01-01" 或 "01/01/2024" 的日期
+            date_pattern = r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})'
+            match = re.search(date_pattern, cleaned_date)
+            if match:
+                year, month, day = map(int, match.groups())
+                return datetime(year, month, day)
+        except:
+            pass
+            
+        logger.debug(f"无法解析日期格式: {date_str}")
+        return None
+
+    def _is_recent_news(self, pub_date: str, hours_threshold: int = 24) -> bool:
+        """
+        判断新闻是否在指定时间内发布
+        默认24小时内为近期新闻
+        """
+        if not pub_date:
+            # 如果没有发布时间，默认认为不是近期新闻
+            return False
+            
+        parsed_date = self._parse_datetime(pub_date)
+        if not parsed_date:
+            # 如果无法解析日期，默认认为不是近期新闻
+            return False
+            
+        # 计算时间差
+        now = datetime.now()
+        time_diff = now - parsed_date
+        
+        # 判断是否在阈值内
+        return time_diff <= timedelta(hours=hours_threshold)
+
+    def fetch_rss_feed(self, feed_url: str, max_items: int = 10, hours_threshold: int = 24) -> List[Dict[str, str]]:
+        """Fetch news items from an RSS feed with time filtering."""
         try:
             logger.info(f"Fetching RSS feed: {feed_url}")
 
@@ -167,38 +243,56 @@ class NewsFetcher:
 
             root = ET.fromstring(response.content)
             items = []
+            filtered_count = 0
 
             if root.tag == 'rss':
-                news_items = root.findall('.//item')[:max_items]
+                news_items = root.findall('.//item')
                 for item in news_items:
                     title = item.find('title')
                     link = item.find('link')
                     description = item.find('description')
                     pub_date = item.find('pubDate')
 
-                    items.append({
+                    news_item = {
                         'title': title.text if title is not None else '',
                         'link': link.text if link is not None else '',
                         'description': self._clean_html(description.text if description is not None else ''),
                         'published': pub_date.text if pub_date is not None else '',
-                    })
+                    }
+
+                    # 应用时效性筛选
+                    if self._is_recent_news(news_item['published'], hours_threshold):
+                        items.append(news_item)
+                        if len(items) >= max_items:
+                            break
+                    else:
+                        filtered_count += 1
+
             else:
                 namespace = {'atom': 'http://www.w3.org/2005/Atom'}
-                entries = root.findall('.//atom:entry', namespace)[:max_items]
+                entries = root.findall('.//atom:entry')
                 for entry in entries:
                     title = entry.find('atom:title', namespace)
                     link = entry.find('atom:link', namespace)
                     summary = entry.find('atom:summary', namespace)
                     updated = entry.find('atom:updated', namespace)
 
-                    items.append({
+                    news_item = {
                         'title': title.text if title is not None else '',
                         'link': link.get('href', '') if link is not None else '',
                         'description': self._clean_html(summary.text if summary is not None else ''),
                         'published': updated.text if updated is not None else '',
-                    })
+                    }
 
-            logger.info(f"Fetched {len(items)} items from RSS feed")
+                    # 应用时效性筛选
+                    if self._is_recent_news(news_item['published'], hours_threshold):
+                        items.append(news_item)
+                        if len(items) >= max_items:
+                            break
+                    else:
+                        filtered_count += 1
+
+            logger.info(f"Fetched {len(items)} recent items from RSS feed (filtered out {filtered_count} older items)")
             return items
 
         except Exception as e:
@@ -258,10 +352,11 @@ class NewsFetcher:
     def fetch_recent_news(
         self,
         language: str = "zh",
-        max_items_per_source: int = 5
+        max_items_per_source: int = 5,
+        hours_threshold: int = 24
     ) -> Dict[str, List[Dict[str, str]]]:
-        """Fetch recent finance, crypto and geopolitical news."""
-        logger.info("Fetching recent finance and geopolitics news from all sources...")
+        """Fetch recent finance, crypto and geopolitical news with time filtering."""
+        logger.info(f"Fetching recent finance and geopolitics news from all sources (last {hours_threshold} hours)...")
 
         all_news = {
             'china_stock': [],
@@ -273,52 +368,61 @@ class NewsFetcher:
             'economic_calendar': [],
         }
 
+        total_filtered = 0
+
         # Fetch China Stock news
         for source_name, feed_url in self.china_stock_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['china_stock'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch US Stock news
         for source_name, feed_url in self.us_stock_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['us_stock'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch Crypto news
         for source_name, feed_url in self.crypto_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['crypto'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch Macro news
         for source_name, feed_url in self.macro_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['macro'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch China Politics news
         for source_name, feed_url in self.china_politics_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['china_politics'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch Global Politics news
         for source_name, feed_url in self.global_politics_feeds.items():
-            items = self.fetch_rss_feed(feed_url, max_items_per_source)
+            items = self.fetch_rss_feed(feed_url, max_items_per_source, hours_threshold)
             for item in items:
                 item['source'] = source_name
                 all_news['global_politics'].append(item)
+            total_filtered += max_items_per_source - len(items)
 
         # Fetch Economic Calendar
         all_news['economic_calendar'] = self.fetch_economic_calendar(7)
 
         logger.info(f"Fetched: 中国股市 {len(all_news['china_stock'])}, 美国股市 {len(all_news['us_stock'])}, 虚拟货币 {len(all_news['crypto'])}, 宏观经济 {len(all_news['macro'])}, 中国政治 {len(all_news['china_politics'])}, 国际政治 {len(all_news['global_politics'])}, 经济日历 {len(all_news['economic_calendar'])}")
+        logger.info(f"Filtered out {total_filtered} older news items due to time threshold ({hours_threshold} hours)")
 
         return all_news
 

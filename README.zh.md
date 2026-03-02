@@ -299,6 +299,7 @@ python main.py
 | `NOTIFICATION_METHODS` | ✅ 必需              | 逗号分隔的列表：`email`、`webhook` 或 `email,webhook`                                                                                     |
 | `AI_RESPONSE_LANGUAGE` | 可选                 | AI 响应的语言代码（默认：`en`）。多语言用逗号分隔（如 `en,zh,ja`）。支持：`zh`、`es`、`fr`、`ja`、`de`、`ko`、`pt`、`ru`、`ar`、`hi`、`it`、`nl` |
 | `ENABLE_WEB_SEARCH`    | 可选                 | 启用网络搜索获取新闻（默认：`false`）                                                                                                     |
+| `HOURS_THRESHOLD`      | 可选                 | ⭐ **新增** 新闻时效性阈值（小时），默认24小时。只获取指定时间内的新闻                                             |
 | `GMAIL_ADDRESS`        | 使用 Gmail 时需要    | 您的 Gmail 邮箱地址                                                                                           |
 | `GMAIL_APP_PASSWORD`   | 使用 Gmail 时需要    | Gmail 应用专用密码（16 位，不是普通密码）                                                                     |
 | `EMAIL_TO`             | 使用邮件时需要       | 收件人邮箱地址                                                                                                |
@@ -337,6 +338,7 @@ news:
   use_real_sources: true
   enable_web_search: false
   max_items_per_source: 10
+  hours_threshold: 24  # ⭐ 新增：新闻时效性阈值（小时），默认24小时
 
   topics:
     - "大语言模型 (LLM)"
